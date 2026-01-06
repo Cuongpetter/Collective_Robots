@@ -1,0 +1,79 @@
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+from sensor_msgs.msg import LaserScan
+import subprocess
+import os
+
+class AutoMapper(Node):
+    def __init__(self):
+        super().__init__('auto_mapper')
+        
+        # Publisher: Sends velocity commands to the robot
+        self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
+        
+        # Subscriber: Listens to the Lidar (scan) data
+        self.subscription = self.create_subscription(
+            LaserScan,
+            '/scan',
+            self.scan_callback,
+            10)
+        
+        self.move_cmd = Twist()
+        self.get_logger().info('Auto Mapper Started! Driving and mapping...')
+
+    def scan_callback(self, msg):
+        # --- IMPROVED OBSTACLE DETECTION ---
+        # 0 is Front. 90 is Left. 270 is Right.
+        
+        # We create a "Front Cone" of vision:
+        front_ranges = msg.ranges[0:30] + msg.ranges[-30:]
+        
+        # Filter out "infinity" (0.0 or inf values usually mean nothing is there)
+        # We replace 0.0 or inf with a large number (10.0 meters) so the logic doesn't break
+        valid_ranges = [dist if dist > 0.05 else 10.0 for dist in front_ranges]
+        
+        # Find the CLOSEST object in that cone
+        min_front_dist = min(valid_ranges)
+
+        # --- LOGIC ---
+        if min_front_dist < 0.6:  # Increased safety distance to 0.6m
+            # Too close! Turn Left
+            self.move_cmd.linear.x = 0.0
+            self.move_cmd.angular.z = 0.5
+            self.get_logger().info(f'Obstacle detected at {min_front_dist:.2f}m! Turning...')
+        else:
+            # Clear! Drive Forward safely
+            self.move_cmd.linear.x = 0.2
+            self.move_cmd.angular.z = 0.0
+
+        self.publisher_.publish(self.move_cmd)     
+   
+
+def save_map():
+    # Define where to save
+    map_path = os.path.expanduser('~/project/my_auto_map')
+    print(f"\nStopping robot and saving map to {map_path}...")
+    
+    # Run the shell command to save the map
+    subprocess.run(["ros2", "run", "nav2_map_server", "map_saver_cli", "-f", map_path])
+    print("Map saved successfully!")
+
+def main(args=None):
+    rclpy.init(args=args)
+    auto_mapper = AutoMapper()
+
+    try:
+        rclpy.spin(auto_mapper)
+    except KeyboardInterrupt:
+        # When you press Ctrl+C, this runs:
+        save_map()
+    finally:
+        # Stop the robot before exiting
+        stop_cmd = Twist()
+        auto_mapper.publisher_.publish(stop_cmd)
+        auto_mapper.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

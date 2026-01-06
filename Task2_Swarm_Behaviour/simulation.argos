@@ -1,0 +1,48 @@
+<?xml version="1.0" ?>
+<argos-configuration>
+  <framework>
+    <system threads="8" />
+    <experiment length="0" ticks_per_second="10" />
+  </framework>
+
+  <controllers>
+    <lua_controller id="lua">
+      <actuators>
+        <differential_steering implementation="default" />
+        <range_and_bearing implementation="default" />
+      </actuators>
+      <sensors>
+        <range_and_bearing implementation="medium" medium="rab" range="3.0" show_rays="true" />
+      </sensors>
+      <params script="swarm.lua" />
+    </lua_controller>
+  </controllers>
+
+  <arena size="200, 200, 1" center="0,0,0.5">
+    <box id="n" size="10,0.1,0.5" movable="false"><body position="0,5,0" orientation="0,0,0" /></box>
+    <box id="s" size="10,0.1,0.5" movable="false"><body position="0,-5,0" orientation="0,0,0" /></box>
+    <box id="e" size="0.1,10,0.5" movable="false"><body position="5,0,0" orientation="0,0,0" /></box>
+    <box id="w" size="0.1,10,0.5" movable="false"><body position="-5,0,0" orientation="0,0,0" /></box>
+
+    <distribute>
+      <position method="uniform" min="-5,-5,0" max="5,5,0" />
+      <!-- <position method="uniform" min="-2,-2,0" max="2,2,0" /> -->
+      <orientation method="gaussian" mean="0,0,0" std_dev="360,0,0" />
+      <entity quantity="80" max_trials="100">
+        <foot-bot id="bot"><controller config="lua" /></foot-bot>
+      </entity>
+    </distribute>
+  </arena>
+
+  <physics_engines><dynamics2d id="dyn2d" /></physics_engines>
+  <media><range_and_bearing id="rab" /><led id="leds" /></media>
+  <visualization>
+  <qt-opengl>
+    <camera>
+      <placements>
+        <placement index="0" position="0,0,20" look_at="0,0,0" up="1,0,0" lens_focal_length="50" />
+      </placements>
+    </camera>
+  </qt-opengl>
+</visualization>
+</argos-configuration>
